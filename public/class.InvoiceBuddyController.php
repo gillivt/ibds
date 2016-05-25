@@ -855,7 +855,7 @@ class InvoiceBuddyController {
         } else {
             throw new RestException(400, "invalid date");
         }
-        if (isset($data->time) && $this->isValidMySQLTIME($data->time)) {
+        if (isset($data->time) && $this->validMySQLTime($data->time)) {
             $diary->time = $data->time;
         } else {
             throw new RestException(400, "invalid time");
@@ -941,6 +941,15 @@ class InvoiceBuddyController {
         return $diary;
     }
     
+    /**
+     * Update Diary Event
+     * 
+     * @param type $data
+     * @return type
+     * @throws RestException
+     * 
+     * @url PUT /trader/diary
+     */
     public function updateDiary($data) {
         //get authorisation from headers
         $headers = getallheaders();
@@ -951,7 +960,33 @@ class InvoiceBuddyController {
         if ($role !== 'trader') {
             throw new RestException(401, "Unauthorized");
         }
+        if (isset($data->id)) {
+            $diary = Diary::find_by_id($data->id);
+            if (!$diary) {
+                throw  new RestException(400, "no such diary event");
+            }
+        } else {
+            throw new RestException(400, "no id specified");
+        }
+        if (isset($data->date) && $this->validMySQLDate($data->date)) {
+            $diary->date = $data->date;
+        } 
+        if (isset($data->time) && $this->validMySQLTime($data->time)) {
+            $diary->time = $data->time;
+        }
+        if (isset($data->description)) {
+            $diary->description = $data->description;
+        }
+        if (isset($data->clientid)) {
+            $diary->clientid = $data->clientid;
+        }
+        $diary->traderid = $this->getTraderID($auth);
         
+        if ($diary->save()) {
+            return $diary;
+        } else {
+            throw new RestException(400,"Unknown Error - unable to update diary");
+        }
     }
     
     public function deleteDiary($data) {
@@ -964,7 +999,17 @@ class InvoiceBuddyController {
         if ($role !== 'trader') {
             throw new RestException(401, "Unauthorized");
         }
+        if (isset($data->id)) {
+            $diary = Diary::find_by_id($data->id);
+            if (!$diary) {
+                throw new RestException(400,"no such diary event");
+            }
+        } else {
+            throw new RestException(400,"id not specified");
+        }
+        $result = $diary->delete();
         
+        return array("result"=>$result);
     }
 
     // Private Helper Functions
@@ -1026,7 +1071,7 @@ class InvoiceBuddyController {
      * @return boolean
      */
     private function validMySQLDate($date) {
-        if (!$this->validMySQLDateFormat) {
+        if (!$this->validMySQLDateFormat($date)) {
             return false;
         }
         $day = substr($date, 8);
@@ -1051,7 +1096,7 @@ class InvoiceBuddyController {
      * @param type $time
      * @return boolean
      */
-    private function validMySQLTIME($time) {
+    private function validMySQLTime($time) {
         if (!$this->validMySQLTimeFormat($time)) {
             return false;
         }
