@@ -7,7 +7,7 @@ class Invoice extends DatabaseObject {
 
     protected static $table_name = "invoice";
     protected static $db_fields = array('id', 'invoicedate', 'amount', 'vatamount',
-        'paymenttype', 'chequenumber', 'clientid', 'productid');
+        'paymenttype', 'chequenumber', 'clientid', 'productid', 'traderid');
     public $id;
     public $invoicedate;
     public $amount;
@@ -16,5 +16,6 @@ class Invoice extends DatabaseObject {
     public $chequenumber;
     public $clientid;
     public $productid;
+    public $traderid;
 }
 ?>

@@ -193,11 +193,8 @@ class InvoiceBuddyController {
         }
         $trader->databaseuserid = $this->getUserID($auth);
 
-        if ($trader->save()) {
-            return $trader;
-        } else {
-            throw new RestException(400, "Unknown error - unable to update");
-        }
+        $trader->save();
+        return $trader;
     }
 
     /**
@@ -231,7 +228,7 @@ class InvoiceBuddyController {
         $user = DatabaseUser::find_by_id($userId);
         $result = $user->delete();
 
-        return array("Success" => $result);
+        return array("delete" => $result);
     }
 
     /**
@@ -373,6 +370,9 @@ class InvoiceBuddyController {
         } else {
             throw new RestException(400, "Client id Not Supplied");
         }
+        if (!$client) {
+            throw new RestException(400, "client does not exist");
+        }
         if (isset($data->firstname)) {
             $client->firstname = $data->firstname;
         }
@@ -412,11 +412,8 @@ class InvoiceBuddyController {
             throw new RestException(400, "traderid Not Supplied");
         }
 
-        if ($client->save()) {
-            return $client;
-        } else {
-            throw new RestException(400, "Unknown Error - client not updated");
-        }
+        $client->save();
+        return $client;
     }
 
     /**
@@ -426,9 +423,9 @@ class InvoiceBuddyController {
      * @return type
      * @throws RestException
      * 
-     * @url DELETE /trader/client
+     * @url DELETE /trader/client/$id
      */
-    public function deleteClient($data) {
+    public function deleteClient($id) {
         //get authorisation from headers
         $headers = getallheaders();
         $auth = $headers["Authorization"];
@@ -438,14 +435,16 @@ class InvoiceBuddyController {
         if ($role !== 'trader') {
             throw new RestException(401, "Unauthorized");
         }
-
-        $client = Client::find_by_id($data->id);
+        if (!isset($id)) {
+            throw new RestException(400, "id not specified");
+        }
+        $client = Client::find_by_id($id);
         if (!$client) {
             throw new RestException(400, "Client not found");
         }
 
         $result = $client->delete();
-        return array("Result" => $result);
+        return array("delete" => $result);
     }
 
     /**
@@ -478,8 +477,8 @@ class InvoiceBuddyController {
         } else {
             throw new RestException(400, "description not supplied");
         }
-        $product->price = isset($data->price) ? $data->price : null;
-        $product->misc = isset($data->misc) ? $data->misc : null;
+        $product->price = isset($data->price) ? $data->price : NULL;
+        $product->misc = isset($data->misc) ? $data->misc : NULL;
         $product->traderid = $this->getTraderID($auth);
 
         if ($product->save()) {
@@ -569,6 +568,9 @@ class InvoiceBuddyController {
         } else {
             throw new RestException(400, "product id not supplied");
         }
+        if (!$product) {
+            throw new RestException(400, "product does not exist");
+        }
         if (isset($data->productkey)) {
             $product->productkey = $data->productkey;
         }
@@ -581,11 +583,8 @@ class InvoiceBuddyController {
         if (isset($data->misc)) {
             $product->misc = $data->misc;
         }
-        if ($product->save()) {
-            return $product;
-        } else {
-            throw new RestException(400, "Unknown Error - can not update product");
-        }
+        $product->save();
+        return $product;
     }
 
     /**
@@ -595,9 +594,9 @@ class InvoiceBuddyController {
      * @return type
      * @throws RestException
      * 
-     * @url DELETE /trader/product
+     * @url DELETE /trader/product/$id
      */
-    public function deleteProduct($data) {
+    public function deleteProduct($id) {
         //get authorisation from headers
         $headers = getallheaders();
         $auth = $headers["Authorization"];
@@ -608,13 +607,13 @@ class InvoiceBuddyController {
             throw new RestException(401, "Unauthorized");
         }
 
-        $product = Product::find_by_id($data->id);
+        $product = Product::find_by_id($id);
 
         if (!$product) {
             throw new RestException(400, "product doesn't exist");
         }
         $result = $product->delete();
-        return array("result" => $result);
+        return array("delete" => $result);
     }
 
     /**
@@ -639,26 +638,29 @@ class InvoiceBuddyController {
 
         $invoice = new Invoice();
 
-        $invoice->invoicedate = isset($data->invoicedate) ? $data->invoicedate : date('Y-m-d');
+        $invoice->invoicedate = (isset($data->invoicedate) && $this->validMySQLDate($data->invoicedate)) ? $data->invoicedate : date('Y-m-d');
         if (isset($data->amount)) {
             $invoice->amount = $data->amount;
         } else {
             throw new RestException(400, "amount not specified");
         }
-        $invoice->vatamount = isset($data->vatamount) ? $data->vatamount : null;
+        $invoice->vatamount = isset($data->vatamount) ? $data->vatamount : 0;
         $invoice->paymenttype = isset($data->paymenttype) ? $data->paymenttype : 'cash';
-        $invoice->chequenumber = isset($data->chequenumber) ? $data->chequenumber : null;
+        $invoice->chequenumber = isset($data->chequenumber) ? $data->chequenumber : 0;
         if (isset($data->clientid)) {
             $invoice->clientid = $data->clientid;
         } else {
             throw new RestException(400, "clientid not specified");
         }
         if (isset($data->productid)) {
+            if(!Product::find_by_id($data->productid)) {
+                throw new RestException(400, "product doesn't exist");
+            }
             $invoice->productid = $data->productid;
         } else {
             throw new RestException(400, "productid not specified");
         }
-
+//return $invoice;
         $result = $invoice->save();
         if ($result) {
             return $invoice;
@@ -774,7 +776,7 @@ class InvoiceBuddyController {
         if (!$invoice) {
             throw new RestException(400, "no such invoice");
         }
-        if (isset($data->invoicedate)) {
+        if (isset($data->invoicedate) && $this->validMySQLDate($data->invoicedate)) {
             $invoice->invoicedate = $data->invoicedate;
         }
         if (isset($data->amount)) {
@@ -789,18 +791,18 @@ class InvoiceBuddyController {
         if (isset($data->chequenumber)) {
             $invoice->chequenumber = $data->chequenumber;
         }
-        if (isset($data->clientid)) {
-            $invoice->clientid = $data->clientid;
-        }
-        if (isset($data->productid)) {
-            $invoice->productid = $data->productid;
-        }
+//        if (isset($data->clientid)) {
+//            $invoice->clientid = $data->clientid;
+//        }
+//        if (isset($data->productid)) {
+//            $invoice->productid = $data->productid;
+//        }
+//        if (isset($data->traderid)) {
+//            $invoice->traderid = $data->traderid;
+//        }
 
-        if ($invoice->save()) {
-            return $invoice;
-        } else {
-            throw new RestException(400, "Unknown Error - unable to update invoice");
-        }
+        $invoice->save();
+        return $invoice;
     }
 
     /**
@@ -810,9 +812,9 @@ class InvoiceBuddyController {
      * @return type
      * @throws RestException
      * 
-     * @url DELETE /trader/invoice
+     * @url DELETE /trader/invoice/$id
      */
-    public function deleteInvoice($data) {
+    public function deleteInvoice($id) {
         //get authorisation from headers
         $headers = getallheaders();
         $auth = $headers["Authorization"];
@@ -822,12 +824,12 @@ class InvoiceBuddyController {
         if ($role !== 'trader') {
             throw new RestException(401, "Unauthorized");
         }
-        $invoice = Invoice::find_by_id($data->id);
+        $invoice = Invoice::find_by_id($id);
         if (!$invoice) {
             throw new RestException(400, "no such invoice");
         }
         $result = $invoice->delete();
-        return array("result" => $result);
+        return array("delete" => $result);
     }
 
     /**
@@ -870,13 +872,14 @@ class InvoiceBuddyController {
         } else {
             throw new RestException(400, " no clientid given");
         }
+        $diary->traderid = $this->getTraderID($auth);
         if ($diary->save()) {
             return $diary;
         } else {
             throw new RestException(400, "Unknown Error - Can not create diary event");
         }
     }
-    
+
     /**
      * Return array of Diary events between two dates
      * 
@@ -887,7 +890,7 @@ class InvoiceBuddyController {
      * 
      * @url GET /trader/diary/$from/$to
      */
-    public function readDiary($from,$to) {
+    public function readDiary($from, $to) {
         //get authorisation from headers
         $headers = getallheaders();
         $auth = $headers["Authorization"];
@@ -901,17 +904,17 @@ class InvoiceBuddyController {
             throw new RestException(400, "invalid dates");
         }
         $traderid = $this->getTraderID($auth);
-        
+
         //make sql string
         $sql = "SELECT * FROM diary WHERE traderid = '{$traderid}' AND ";
         $sql .= "date >= '{$from}' AND ";
         $sql .= "date <= '{$to}'";
-        
+
         $diary = Diary::find_by_sql($sql);
-        
+
         return $diary;
     }
-    
+
     /**
      * Read Todays Diary Events
      * 
@@ -930,17 +933,17 @@ class InvoiceBuddyController {
         if ($role !== 'trader') {
             throw new RestException(401, "Unauthorized");
         }
-        $today = $date('Y-m-d');
+        $today = date('Y-m-d');
         $traderid = $this->getTraderID($auth);
-        
+
         $sql = "SELECT * FROM diary WHERE traderid= '{$traderid}' AND ";
         $sql .= "date = '{$today}'";
-        
+
         $diary = Diary::find_by_sql($sql);
-        
+
         return $diary;
     }
-    
+
     /**
      * Update Diary Event
      * 
@@ -963,14 +966,14 @@ class InvoiceBuddyController {
         if (isset($data->id)) {
             $diary = Diary::find_by_id($data->id);
             if (!$diary) {
-                throw  new RestException(400, "no such diary event");
+                throw new RestException(400, "no such diary event");
             }
         } else {
             throw new RestException(400, "no id specified");
         }
         if (isset($data->date) && $this->validMySQLDate($data->date)) {
             $diary->date = $data->date;
-        } 
+        }
         if (isset($data->time) && $this->validMySQLTime($data->time)) {
             $diary->time = $data->time;
         }
@@ -981,15 +984,21 @@ class InvoiceBuddyController {
             $diary->clientid = $data->clientid;
         }
         $diary->traderid = $this->getTraderID($auth);
-        
-        if ($diary->save()) {
-            return $diary;
-        } else {
-            throw new RestException(400,"Unknown Error - unable to update diary");
-        }
+
+        $diary->save();
+        return $diary;
     }
     
-    public function deleteDiary($data) {
+    /**
+     * Delete Diary Event
+     * 
+     * @param type $id
+     * @return type
+     * @throws RestException
+     * 
+     * @url DELETE /trader/diary/$id
+     */
+    public function deleteDiary($id) {
         //get authorisation from headers
         $headers = getallheaders();
         $auth = $headers["Authorization"];
@@ -999,17 +1008,17 @@ class InvoiceBuddyController {
         if ($role !== 'trader') {
             throw new RestException(401, "Unauthorized");
         }
-        if (isset($data->id)) {
-            $diary = Diary::find_by_id($data->id);
+        if (isset($id)) {
+            $diary = Diary::find_by_id($id);
             if (!$diary) {
-                throw new RestException(400,"no such diary event");
+                throw new RestException(400, "no such diary event");
             }
         } else {
-            throw new RestException(400,"id not specified");
+            throw new RestException(400, "id not specified");
         }
         $result = $diary->delete();
-        
-        return array("result"=>$result);
+
+        return array("delete" => $result);
     }
 
     // Private Helper Functions
